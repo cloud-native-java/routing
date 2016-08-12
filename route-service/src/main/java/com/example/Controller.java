@@ -12,6 +12,9 @@ import org.springframework.web.client.RestOperations;
 
 import java.net.URI;
 
+/**
+ * @author Ben Hale
+ */
 @RestController
 class Controller {
 
@@ -32,8 +35,8 @@ class Controller {
 
 	@RequestMapping(headers = {FORWARDED_URL, PROXY_METADATA, PROXY_SIGNATURE})
 	ResponseEntity<?> service(RequestEntity<byte[]> incoming) {
-		this.logger.info("Incoming Request: {}", incoming);
 
+		this.logger.info("Incoming Request: {}", incoming);
 		RequestEntity<?> outgoing = getOutgoingRequest(incoming);
 		this.logger.info("Outgoing Request: {}", outgoing);
 

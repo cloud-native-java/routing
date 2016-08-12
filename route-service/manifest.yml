@@ -1,8 +1,8 @@
 ---
 applications:
-- name: cnj-route-service
+- name: route-service
   memory: 512M
   instances: 1
   random-route: true
-  path: target/route-service-1.0.0.BUILD-SNAPSHOT.jar
+  path: target/route-service.jar
   buildpack: https://github.com/cloudfoundry/java-buildpack.git

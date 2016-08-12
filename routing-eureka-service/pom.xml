@@ -8,8 +8,8 @@
         <artifactId>routing</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>eureka-service</artifactId>
-    <name>routing/eureka-service</name>
+    <artifactId>routing-eureka-service</artifactId>
+    <name>routing/routing-eureka-service</name>
     <dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>

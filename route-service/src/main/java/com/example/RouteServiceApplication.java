@@ -21,15 +21,18 @@ import java.security.cert.X509Certificate;
 
 /**
  * Next, create a user provided service that contains the route service
- * <p>
+ *
  * <p>
  * The next step assumes that you have an application already running that you'd
  * like to bind this route service to. To do this, run the following command,
- * substituting the domain and hostname bound to that application: ```bash $ cf
- * bind-route-service <APPLICATION-DOMAIN> test-route-service --hostname
+ * substituting the domain and hostname bound to that application:
+ *
+ * ```bash $ cf bind-route-service <APPLICATION-DOMAIN> test-route-service --hostname
+ *
  * <APPLICATION-HOST> ```
+ *
  * <p>
- * <p>
+ *
  * In order to view the interception of the requests, you will need to stream
  * the logs of the route service. To do this, run the following command: ```bash
  * $ cf logs route-service-example ```
