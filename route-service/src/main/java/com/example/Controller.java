@@ -8,7 +8,7 @@ import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 
@@ -18,46 +18,47 @@ import java.net.URI;
 @RestController
 class Controller {
 
-	static final String FORWARDED_URL = "X-CF-Forwarded-Url";
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-	static final String PROXY_METADATA = "X-CF-Proxy-Metadata";
+    //<1>
+    private static final String FORWARDED_URL = "X-CF-Forwarded-Url";
+    private static final String PROXY_METADATA = "X-CF-Proxy-Metadata";
+    private static final String PROXY_SIGNATURE = "X-CF-Proxy-Signature";
 
-	static final String PROXY_SIGNATURE = "X-CF-Proxy-Signature";
+    private final RestTemplate restOperations;
 
-	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    // <2>
+    @RequestMapping(headers = {FORWARDED_URL, PROXY_METADATA, PROXY_SIGNATURE})
+    ResponseEntity<?> service(RequestEntity<byte[]> incoming) {
 
-	private final RestOperations restOperations;
+        this.logger.info("incoming request: {}", incoming);
 
-	@Autowired
-	Controller(RestOperations restOperations) {
-		this.restOperations = restOperations;
-	}
+        HttpHeaders headers = new HttpHeaders();
+        headers.putAll(incoming.getHeaders());
 
-	@RequestMapping(headers = {FORWARDED_URL, PROXY_METADATA, PROXY_SIGNATURE})
-	ResponseEntity<?> service(RequestEntity<byte[]> incoming) {
+        // <3>
+        URI uri = headers
+                .remove(FORWARDED_URL)
+                .stream()
+                .findFirst()
+                .map(URI::create)
+                .orElseThrow(() -> new IllegalStateException(
+                        String.format("No %s header present", FORWARDED_URL)));
 
-		this.logger.info("Incoming Request: {}", incoming);
-		RequestEntity<?> outgoing = getOutgoingRequest(incoming);
-		this.logger.info("Outgoing Request: {}", outgoing);
+        // <4>
+        RequestEntity<?> outgoing = new RequestEntity<>(
+                ((RequestEntity<?>) incoming).getBody(),
+                headers,
+                incoming.getMethod(),
+                uri);
 
-		return this.restOperations.exchange(outgoing, byte[].class);
-	}
+        this.logger.info("outgoing request: {}", outgoing);
 
-	private static RequestEntity<?> getOutgoingRequest(RequestEntity<?> incoming) {
-		HttpHeaders headers = new HttpHeaders();
-		headers.putAll(incoming.getHeaders());
+        return this.restOperations.exchange(outgoing, byte[].class);
+    }
 
-		URI uri = headers
-				.remove(FORWARDED_URL)
-				.stream()
-				.findFirst()
-				.map(URI::create)
-				.orElseThrow(
-						() -> new IllegalStateException(String.format(
-								"No %s header present", FORWARDED_URL)));
-
-		return new RequestEntity<>(incoming.getBody(), headers,
-				incoming.getMethod(), uri);
-	}
-
+    @Autowired
+    Controller(RestTemplate restOperations) {
+        this.restOperations = restOperations;
+    }
 }

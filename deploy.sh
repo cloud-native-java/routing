@@ -1,42 +1,39 @@
 #!/usr/bin/env bash
-
 set -e
 
 source $BUILD_DIRECTORY/utils/cf-common.sh
-#
-#cs=configuration-service
-#rb=rabbitmq-bus
-#
-#cf s | grep $rb || cf cs cloudamqp lemur $rb
-#
-#cf d -f configuration-client
-#cf d -f $cs
-#cf s | grep $cs && cf ds -f $cs
-#
-#deploy_app $cs
-#deploy_service $cs
-#deploy_app configuration-client
 
-
-
-# first test: deploy the downstream service
-
-#lrs=logging-route-service
-#mvn -DskipTests clean install
-#cf push -p target/route-service.jar $lrs
-#cf create-user-provided-service test-route-service -r https://<ROUTE-SERVICE-ADDRESS>
-
+mvn -DskipTests clean install
 
 # EUREKA SERVICE
 res=routing-eureka-service
+cf ds -f $res
 cf a | grep $res && cf d -f $res
 deploy_app $res
 deploy_service $res
 
-# ROUTE SERVICE
+# ROUTE SERVICE (https://www.cloudfoundry.org/route-services/)
 rs=route-service
+cf a | grep $rs && cf d -f $rs
 deploy_app $rs
-# now we have the actual logging RS, let's CUPS it and bind that to something else
 ad=`app_domain $rs`
 echo $ad
+cf ds -f $rs
 cf cups $rs -r https://$ad
+
+# DOWNSTREAM SERVICE
+## here we bind the downstream service (by its route)
+## to the route-service we've configured
+ds=downstream-service
+cf a | grep $ds && cf d -f $ds
+deploy_app $ds
+url=`app_domain $ds`
+IFS='.' read -a fragments <<< "${url}"
+h=""
+d=""
+for i in "${fragments[@]}"
+do
+  [ "$h" == "" ] && h="$i" || d="${d}.${i}"
+done
+d=${d:1:${#d}} # this keeps everything after first '.'
+cf bind-route-service $d $rs -hostname $h
