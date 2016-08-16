@@ -10,7 +10,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>route-service</artifactId>
-    <name>routing/routing/route-service</name>
+    <name>routing/route-service</name>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
