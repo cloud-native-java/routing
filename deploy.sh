@@ -51,11 +51,6 @@ rs=route-service
 # here we bind the downstream service (by its route) to the route-service we've configured
 
 ds=downstream-service
-
 apply_route_service unbind-route-service $rs $ds
-
 cf a | grep $ds || deploy_app $ds
-
 apply_route_service bind-route-service $rs $ds
-
-
