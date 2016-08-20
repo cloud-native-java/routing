@@ -25,7 +25,7 @@ function apply_route_service(){
     } || echo "can't find $downstream_svc so not running apply_route_service"
 }
 
-# mvn -DskipTests clean install
+mvn -DskipTests clean install
 
 rs=route-service
 
