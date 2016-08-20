@@ -30,21 +30,21 @@ function apply_route_service(){
 rs=route-service
 
 # EUREKA SERVICE
-#res=routing-eureka-service
-#cf ds -f $res
-#cf a | grep $res && cf d -f $res
-#deploy_app $res
-#deploy_service $res
-#
-## ROUTE SERVICE (https://www.cloudfoundry.org/route-services/)
-#rs=route-service
-#cf a | grep $rs && cf d -f $rs
-#deploy_app $rs
-#ad=`app_domain $rs`
-#echo $ad
-#cf ds -f $rs
-#cf s | grep $rs && cf uups $rs -r https://$ad
-#cf s | grep $rs || cf cups $rs -r https://$ad
+res=routing-eureka-service
+cf ds -f $res
+cf a | grep $res && cf d -f $res
+deploy_app $res
+deploy_service $res
+
+# ROUTE SERVICE (https://www.cloudfoundry.org/route-services/)
+rs=route-service
+cf a | grep $rs && cf d -f $rs
+deploy_app $rs
+ad=`app_domain $rs`
+echo $ad
+cf ds -f $rs
+cf s | grep $rs && cf uups $rs -r https://$ad
+cf s | grep $rs || cf cups $rs -r https://$ad
 
 # DOWNSTREAM SERVICE
 # https://docs.cloudfoundry.org/services/route-services.html & https://github.com/cloudfoundry-samples/ratelimit-service/blob/master/main.go < rate limiter!
