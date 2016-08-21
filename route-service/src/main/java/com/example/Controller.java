@@ -8,6 +8,7 @@ import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -25,7 +26,7 @@ class Controller {
     private static final String PROXY_METADATA = "X-CF-Proxy-Metadata";
     private static final String PROXY_SIGNATURE = "X-CF-Proxy-Signature";
 
-    private final RestTemplate restOperations;
+    private final RestOperations restOperations;
 
     // <2>
     @RequestMapping(headers = {FORWARDED_URL, PROXY_METADATA, PROXY_SIGNATURE})
