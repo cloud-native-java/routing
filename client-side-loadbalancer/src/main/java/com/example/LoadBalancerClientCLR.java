@@ -24,11 +24,9 @@ public class LoadBalancerClientCLR implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        LoadBalancerRequest<URI> loadBalancerRequest = server -> URI
-                .create("http://" + server.getHost() + ":" + server.getPort()
-                        + "/");
-        URI uri = this.loadBalancerClient.execute("greetings-service",
-                loadBalancerRequest);
+        LoadBalancerRequest<URI> loadBalancerRequest =
+                server -> URI.create("http://" + server.getHost() + ":" + server.getPort() + "/");
+        URI uri = this.loadBalancerClient.execute("greetings-service", loadBalancerRequest);
         log.info("resolved service " + uri.toString());
     }
 
