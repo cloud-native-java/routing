@@ -21,16 +21,14 @@ public class LoadBalancedRestTemplateCLR implements CommandLineRunner {
 
 	// <1>
 	@Autowired
-	public LoadBalancedRestTemplateCLR(
-			@LoadBalanced RestTemplate restTemplate) {
+	public LoadBalancedRestTemplateCLR(@LoadBalanced RestTemplate restTemplate) {
 		this.restTemplate = restTemplate;
 	}
 
 	@Override
 	public void run(String... strings) throws Exception {
 
-		Map<String, String> variables =
-				Collections.singletonMap("name", "Cloud Natives!");
+		Map<String, String> variables = Collections.singletonMap("name", "Cloud Natives!");
 
 		// <2>
 		ResponseEntity<JsonNode> response = this.restTemplate.getForEntity(

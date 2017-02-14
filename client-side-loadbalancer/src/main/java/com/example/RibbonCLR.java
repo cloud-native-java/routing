@@ -16,38 +16,37 @@ import java.util.stream.IntStream;
 @Component
 public class RibbonCLR implements CommandLineRunner {
 
-    private final DiscoveryClient discoveryClient;
+	private final DiscoveryClient discoveryClient;
 
-    private final Log log = LogFactory.getLog(getClass());
+	private final Log log = LogFactory.getLog(getClass());
 
-    @Autowired
-    public RibbonCLR(DiscoveryClient discoveryClient) {
-        this.discoveryClient = discoveryClient;
-    }
+	@Autowired
+	public RibbonCLR(DiscoveryClient discoveryClient) {
+		this.discoveryClient = discoveryClient;
+	}
 
-    @Override
-    public void run(String... args) throws Exception {
+	@Override
+	public void run(String... args) throws Exception {
 
-        String serviceId = "greetings-service";
+		String serviceId = "greetings-service";
 
-        // <1>
-        List<Server> servers = this.discoveryClient.getInstances(serviceId)
-                .stream().map(si -> new Server(si.getHost(), si.getPort()))
-                .collect(Collectors.toList());
+		// <1>
+		List<Server> servers = this.discoveryClient.getInstances(serviceId).stream()
+				.map(si -> new Server(si.getHost(), si.getPort())).collect(Collectors.toList());
 
-        // <2>
-        IRule roundRobinRule = new RoundRobinRule();
+		// <2>
+		IRule roundRobinRule = new RoundRobinRule();
 
-        BaseLoadBalancer loadBalancer = LoadBalancerBuilder.newBuilder()
-                .withRule(roundRobinRule)
-                .buildFixedServerListLoadBalancer(servers);
+		BaseLoadBalancer loadBalancer = LoadBalancerBuilder.newBuilder()
+				.withRule(roundRobinRule).buildFixedServerListLoadBalancer(servers);
 
-        IntStream.range(0, 10).forEach(i -> {
-            // <3>
-            Server server = loadBalancer.chooseServer();
-            URI uri = URI.create("http://" + server.getHost() + ":"
-                    + server.getPort() + "/");
-            log.info("resolved service " + uri.toString());
-        });
-    }
+		IntStream.range(0, 10)
+				.forEach(i -> {
+					// <3>
+						Server server = loadBalancer.chooseServer();
+						URI uri = URI.create("http://" + server.getHost() + ":" + server.getPort()
+								+ "/");
+						log.info("resolved service " + uri.toString());
+					});
+	}
 }

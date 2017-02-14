@@ -19,47 +19,43 @@ import java.net.URI;
 @RestController
 class Controller {
 
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+	// <1>
+	private static final String FORWARDED_URL = "X-CF-Forwarded-Url";
+	private static final String PROXY_METADATA = "X-CF-Proxy-Metadata";
+	private static final String PROXY_SIGNATURE = "X-CF-Proxy-Signature";
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+	private final RestOperations restOperations;
 
-    //<1>
-    private static final String FORWARDED_URL = "X-CF-Forwarded-Url";
-    private static final String PROXY_METADATA = "X-CF-Proxy-Metadata";
-    private static final String PROXY_SIGNATURE = "X-CF-Proxy-Signature";
+	@Autowired
+	Controller(RestTemplate restOperations) {
+		this.restOperations = restOperations;
+	}
 
-    private final RestOperations restOperations;
+	// <2>
+	@RequestMapping(headers = { FORWARDED_URL, PROXY_METADATA, PROXY_SIGNATURE })
+	ResponseEntity<?> service(RequestEntity<byte[]> incoming) {
 
-    // <2>
-    @RequestMapping(headers = {FORWARDED_URL, PROXY_METADATA, PROXY_SIGNATURE})
-    ResponseEntity<?> service(RequestEntity<byte[]> incoming) {
+		this.logger.info("incoming request: {}", incoming);
 
-        this.logger.info("incoming request: {}", incoming);
+		HttpHeaders headers = new HttpHeaders();
+		headers.putAll(incoming.getHeaders());
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.putAll(incoming.getHeaders());
+		// <3>
+		URI uri = headers
+				.remove(FORWARDED_URL)
+				.stream()
+				.findFirst()
+				.map(URI::create)
+				.orElseThrow(
+						() -> new IllegalStateException(String.format("No %s header present",
+								FORWARDED_URL)));
 
-        // <3>
-        URI uri = headers
-                .remove(FORWARDED_URL)
-                .stream()
-                .findFirst()
-                .map(URI::create)
-                .orElseThrow(() -> new IllegalStateException(
-                        String.format("No %s header present", FORWARDED_URL)));
+		// <4>
+		RequestEntity<?> outgoing = new RequestEntity<>(
+				((RequestEntity<?>) incoming).getBody(), headers, incoming.getMethod(), uri);
 
-        // <4>
-        RequestEntity<?> outgoing = new RequestEntity<>(
-                ((RequestEntity<?>) incoming).getBody(),
-                headers,
-                incoming.getMethod(),
-                uri);
+		this.logger.info("outgoing request: {}", outgoing);
 
-        this.logger.info("outgoing request: {}", outgoing);
-
-        return this.restOperations.exchange(outgoing, byte[].class);
-    }
-
-    @Autowired
-    Controller(RestTemplate restOperations) {
-        this.restOperations = restOperations;
-    }
+		return this.restOperations.exchange(outgoing, byte[].class);
+	}
 }
