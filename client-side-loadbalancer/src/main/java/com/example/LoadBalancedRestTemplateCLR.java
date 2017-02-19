@@ -16,25 +16,25 @@ import java.util.Map;
 @Component
 public class LoadBalancedRestTemplateCLR implements CommandLineRunner {
 
-	private final RestTemplate restTemplate;
-	private final Log log = LogFactory.getLog(getClass());
+ private final RestTemplate restTemplate;
+ private final Log log = LogFactory.getLog(getClass());
 
-	// <1>
-	@Autowired
-	public LoadBalancedRestTemplateCLR(@LoadBalanced RestTemplate restTemplate) {
-		this.restTemplate = restTemplate;
-	}
+ // <1>
+ @Autowired
+ public LoadBalancedRestTemplateCLR(@LoadBalanced RestTemplate restTemplate) {
+  this.restTemplate = restTemplate;
+ }
 
-	@Override
-	public void run(String... strings) throws Exception {
+ @Override
+ public void run(String... strings) throws Exception {
 
-		Map<String, String> variables = Collections.singletonMap("name", "Cloud Natives!");
+  Map<String, String> variables = Collections.singletonMap("name", "Cloud Natives!");
 
-		// <2>
-		ResponseEntity<JsonNode> response = this.restTemplate.getForEntity(
-				"//greetings-service/hi/{name}", JsonNode.class, variables);
-		JsonNode body = response.getBody();
-		String greeting = body.get("greeting").asText();
-		log.info("greeting: " + greeting);
-	}
+  // <2>
+  ResponseEntity<JsonNode> response = this.restTemplate.getForEntity(
+    "//greetings-service/hi/{name}", JsonNode.class, variables);
+  JsonNode body = response.getBody();
+  String greeting = body.get("greeting").asText();
+  log.info("greeting: " + greeting);
+ }
 }

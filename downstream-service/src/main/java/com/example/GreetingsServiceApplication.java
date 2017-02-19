@@ -16,17 +16,17 @@ import java.util.Map;
 @SpringBootApplication
 public class GreetingsServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(GreetingsServiceApplication.class, args);
-	}
+ public static void main(String[] args) {
+  SpringApplication.run(GreetingsServiceApplication.class, args);
+ }
 }
 
 @RestController
 class GreetingsRestController {
 
-	// <2>
-	@RequestMapping(method = RequestMethod.GET, value = "/hi/{name}")
-	Map<String, String> hi(@PathVariable String name) {
-		return Collections.singletonMap("greeting", "Hello, " + name + "!");
-	}
+ // <2>
+ @RequestMapping(method = RequestMethod.GET, value = "/hi/{name}")
+ Map<String, String> hi(@PathVariable String name) {
+  return Collections.singletonMap("greeting", "Hello, " + name + "!");
+ }
 }
