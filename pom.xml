@@ -19,6 +19,7 @@
         <module>routing-eureka-service</module>
         <module>client-side-loadbalancer</module>
         <module>route-service</module>
+        <module>routing-it</module>
     </modules>
 
 

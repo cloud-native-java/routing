@@ -3,6 +3,6 @@ applications:
 - name: route-service
   memory: 512M
   instances: 1
-  random-route: true
+  host: route-service-${random-word}
   path: target/route-service.jar
   buildpack: https://github.com/cloudfoundry/java-buildpack.git

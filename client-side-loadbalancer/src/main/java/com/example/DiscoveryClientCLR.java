@@ -31,12 +31,13 @@ public class DiscoveryClientCLR implements CommandLineRunner {
   // <3>
   String serviceId = "greetings-service";
   this.log.info(String.format("registered instances of '%s'", serviceId));
-  this.discoveryClient.getInstances(serviceId).forEach(this::logServiceInstance);
+  this.discoveryClient.getInstances(serviceId)
+   .forEach(this::logServiceInstance);
  }
 
  private void logServiceInstance(ServiceInstance si) {
-  String msg = String.format("host = %s, port = %s, service ID = %s", si.getHost(),
-    si.getPort(), si.getServiceId());
+  String msg = String.format("host = %s, port = %s, service ID = %s",
+   si.getHost(), si.getPort(), si.getServiceId());
   log.info(msg);
  }
 }

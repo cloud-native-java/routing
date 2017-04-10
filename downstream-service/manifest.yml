@@ -3,7 +3,7 @@ applications:
 - name: downstream-service
   memory: 512M
   instances: 1
-  random-route: true
+  host: downstream-service-${random-word}
   buildpack: https://github.com/cloudfoundry/java-buildpack.git
   path: target/downstream-service.jar
   services:

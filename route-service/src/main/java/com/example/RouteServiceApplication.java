@@ -35,12 +35,13 @@ public class RouteServiceApplication {
  @Bean
  RestTemplate restOperations() {
   RestTemplate restTemplate = new RestTemplate(
-    new TrustEverythingClientHttpRequestFactory()); // <2>
+   new TrustEverythingClientHttpRequestFactory()); // <2>
   restTemplate.setErrorHandler(new NoErrorsResponseErrorHandler()); // <3>
   return restTemplate;
  }
 
- private static class NoErrorsResponseErrorHandler extends DefaultResponseErrorHandler {
+ private static class NoErrorsResponseErrorHandler extends
+  DefaultResponseErrorHandler {
 
   @Override
   public boolean hasError(ClientHttpResponse response) throws IOException {
@@ -49,7 +50,7 @@ public class RouteServiceApplication {
  }
 
  private static final class TrustEverythingClientHttpRequestFactory extends
-   SimpleClientHttpRequestFactory {
+  SimpleClientHttpRequestFactory {
 
   private static SSLContext getSslContext(TrustManager trustManager) {
    try {
@@ -63,7 +64,8 @@ public class RouteServiceApplication {
   }
 
   @Override
-  protected HttpURLConnection openConnection(URL url, Proxy proxy) throws IOException {
+  protected HttpURLConnection openConnection(URL url, Proxy proxy)
+   throws IOException {
    HttpURLConnection connection = super.openConnection(url, proxy);
    if (connection instanceof HttpsURLConnection) {
     HttpsURLConnection httpsConnection = (HttpsURLConnection) connection;
@@ -75,16 +77,17 @@ public class RouteServiceApplication {
   }
  }
 
- private static final class TrustEverythingTrustManager implements X509TrustManager {
+ private static final class TrustEverythingTrustManager implements
+  X509TrustManager {
 
   @Override
   public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
-    throws CertificateException {
+   throws CertificateException {
   }
 
   @Override
   public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
-    throws CertificateException {
+   throws CertificateException {
   }
 
   @Override

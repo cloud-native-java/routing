@@ -32,21 +32,21 @@ public class RibbonCLR implements CommandLineRunner {
 
   // <1>
   List<Server> servers = this.discoveryClient.getInstances(serviceId).stream()
-    .map(si -> new Server(si.getHost(), si.getPort())).collect(Collectors.toList());
+   .map(si -> new Server(si.getHost(), si.getPort()))
+   .collect(Collectors.toList());
 
   // <2>
   IRule roundRobinRule = new RoundRobinRule();
 
   BaseLoadBalancer loadBalancer = LoadBalancerBuilder.newBuilder()
-    .withRule(roundRobinRule).buildFixedServerListLoadBalancer(servers);
+   .withRule(roundRobinRule).buildFixedServerListLoadBalancer(servers);
 
-  IntStream.range(0, 10)
-    .forEach(i -> {
-     // <3>
-      Server server = loadBalancer.chooseServer();
-      URI uri = URI.create("http://" + server.getHost() + ":" + server.getPort()
-        + "/");
-      log.info("resolved service " + uri.toString());
-     });
+  IntStream.range(0, 10).forEach(i -> {
+   // <3>
+   Server server = loadBalancer.chooseServer();
+   URI uri = URI.create("http://" + server.getHost() + ":" + server.getPort()
+    + "/");
+   log.info("resolved service " + uri.toString());
+  });
  }
 }

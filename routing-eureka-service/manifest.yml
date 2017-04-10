@@ -3,6 +3,6 @@ applications:
 - name: routing-eureka-service
   memory: 512M
   instances: 1
-  random-route: true
+  host: routing-eureka-service-${random-word}
   buildpack: https://github.com/cloudfoundry/java-buildpack.git
   path: target/routing-eureka-service.jar
