@@ -3,6 +3,7 @@ package routing;
 import cnj.CloudFoundryService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.cloudfoundry.client.v2.ClientV2Exception;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.applications.ApplicationManifest;
 import org.cloudfoundry.operations.routes.ListRoutesRequest;
@@ -24,6 +25,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
+import java.util.stream.Stream;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = RoutingIT.Config.class)
@@ -34,9 +36,6 @@ public class RoutingIT {
     }
 
     private Log log = LogFactory.getLog(getClass());
-
-    private ClassPathResource script = new ClassPathResource(
-            "/unbind_route_service_hack.sh");
 
     private File downstreamApplicationManifest, eurekaServiceManifest,
             routeServiceManifest;
@@ -52,22 +51,13 @@ public class RoutingIT {
 
     @Before
     public void before() throws Throwable {
-
         File root = new File(".");
-
-        this.downstreamApplicationManifest = new File(root,
-                "../downstream-service/manifest.yml");
-        Assert.assertTrue("the Downstream Service manifes should exist.",
-                this.downstreamApplicationManifest.exists());
-
-        this.eurekaServiceManifest = new File(root,
-                "../routing-eureka-service/manifest.yml");
-        Assert.assertTrue("the Eureka service registry should exist.",
-                eurekaServiceManifest.exists());
-
+        this.downstreamApplicationManifest = new File(root, "../downstream-service/manifest.yml");
+        this.eurekaServiceManifest = new File(root, "../routing-eureka-service/manifest.yml");
         this.routeServiceManifest = new File("../route-service/manifest.yml");
-        Assert.assertTrue("the Route Service manifest should exist.",
-                this.routeServiceManifest.exists());
+
+        Stream.of(this.downstreamApplicationManifest, this.eurekaServiceManifest, this.routeServiceManifest)
+                .forEach(m -> Assert.assertTrue(m.getAbsolutePath() + " must exist", m.exists()));
 
         this.reset();
     }
@@ -100,14 +90,19 @@ public class RoutingIT {
         String[] svcs = "route-service-svc,routing-eureka-service".split(",");
         for (String s : svcs) {
             log.info("service: " + s);
-            this.cf.destroyServiceIfExists(s);
+            try {
+                this.cf.destroyServiceIfExists(s);
+            }
+            catch (ClientV2Exception e) {
+                this.log.info("exception: '" + e.getDescription() + "' on attempting to delete " + s);
+            }
         }
 
     }
 
     private void runUnbindRouteServiceFor(String serviceId) throws Throwable {
         Route downstreamAppRoute = this.forApplicationName(serviceId);
-        if (null != downstreamAppRoute && cf.applicationExists(serviceId)){
+        if (null != downstreamAppRoute && cf.applicationExists(serviceId)) {
             this.cloudFoundryOperations.services()
                     .unbindRoute(UnbindRouteServiceInstanceRequest
                             .builder()
