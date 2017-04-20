@@ -1,7 +1,6 @@
 package routing;
 
 import cnj.CloudFoundryService;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cloudfoundry.operations.CloudFoundryOperations;
@@ -10,6 +9,7 @@ import org.cloudfoundry.operations.routes.ListRoutesRequest;
 import org.cloudfoundry.operations.routes.Route;
 import org.cloudfoundry.operations.services.BindRouteServiceInstanceRequest;
 import org.cloudfoundry.operations.services.CreateUserProvidedServiceInstanceRequest;
+import org.cloudfoundry.operations.services.UnbindRouteServiceInstanceRequest;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -21,13 +21,9 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.util.FileCopyUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = RoutingIT.Config.class)
@@ -112,29 +108,18 @@ public class RoutingIT {
 
  private void runUnbindRouteServiceFor(String serviceId) throws Throwable {
 
-  log
-   .warn("!!WARNING!!! this script is a hack and shouldn't be required!! "
-    + "As of 10 April 2017, the  changes to the CF Java Client "
-    + "were due any day, and should support unbinding routes. Then, "
-    + "any code in this integration test supporting running this shell "
-    + "script can be deleted and the route-service may be unbound programmatically.");
 
-  File out = File.createTempFile("script", ".sh");
-  Route downstreamAppRoute = forApplicationName(serviceId);
-  if (null == downstreamAppRoute) {
-   log.info("no existing route found for the " + serviceId
-    + " so returning. no need to attempt to delete it.");
-   return;
-  }
-  try (InputStream in = this.script.getInputStream();
-   OutputStream os = new FileOutputStream(out)) {
-   FileCopyUtils.copy(in, os);
-  }
-  String cmd = out.getAbsolutePath() + " " + downstreamAppRoute.getHost();
-  log.info("executing command " + cmd);
-  Runtime.getRuntime().exec("chmod a+x " + out.getAbsolutePath());
-  this.log.info("results of the command: " + System.lineSeparator()
-   + IOUtils.toString(Runtime.getRuntime().exec(cmd).getInputStream()));
+//  cf unbind-route-service cfapps.io route-service-svc -n $1 -f
+  Route downstreamAppRoute = this.forApplicationName(serviceId);
+
+  this.cloudFoundryOperations.services()
+          .unbindRoute(UnbindRouteServiceInstanceRequest
+                  .builder()
+                  .domainName("cfapps.io")
+                  .serviceInstanceName("route-service-svc")
+                  .hostname( downstreamAppRoute.getHost())
+                  .build())
+  .block();
  }
 
  private void deployEureka() throws Throwable {
