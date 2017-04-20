@@ -11,6 +11,7 @@ import org.cloudfoundry.operations.routes.Route;
 import org.cloudfoundry.operations.services.BindRouteServiceInstanceRequest;
 import org.cloudfoundry.operations.services.CreateUserProvidedServiceInstanceRequest;
 import org.cloudfoundry.operations.services.UnbindRouteServiceInstanceRequest;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,7 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.web.client.RestTemplate;
@@ -40,11 +41,127 @@ public class RoutingIT {
     private File downstreamApplicationManifest, eurekaServiceManifest,
             routeServiceManifest;
 
-    private String downstreamServiceId = "downstream-service",
+    private String eurekaServiceId = "routing-eureka-service", downstreamServiceId = "downstream-service",
             routeServiceId = "route-service";
+
+    private String routeServiceIdCups = routeServiceId + "-svc";
 
     @Autowired
     private CloudFoundryOperations cloudFoundryOperations;
+
+    private void applyRouteService() {
+        log.info("binding route service for routeServiceId: " + routeServiceId
+                + " and downstreamApplicationId: " + downstreamServiceId);
+        String url = cf.urlForApplication(routeServiceId);
+        if (url.contains("://")) {
+            url = "https://" + url.split("://")[1];
+        }
+
+
+        this.cloudFoundryOperations
+                .services()
+                .createUserProvidedInstance(
+                        CreateUserProvidedServiceInstanceRequest.builder().name(routeServiceIdCups)
+                                .routeServiceUrl(url).build()).block();
+        Route first = forApplicationName(downstreamServiceId);
+
+        Assert.assertNotNull("there must be a route assigned to the service ID " + downstreamServiceId, first);
+
+
+        log.info("trying to apply route service with: " + "domain: "
+                + first.getDomain() + ", path: " + first.getPath() + ", hostname: "
+                + first.getHost() + ", routeServiceInstanceId: " + routeServiceIdCups);
+
+
+        this.cloudFoundryOperations
+                .services()
+                .bindRoute(
+                        BindRouteServiceInstanceRequest.builder()
+                                .serviceInstanceName(routeServiceIdCups).domainName(first.getDomain())
+                                .hostname(first.getHost()).path(first.getPath()).build()).block();
+        this.log.info("done!");
+    }
+
+    private void deleteApps() throws Throwable {
+        Stream.of(this.routeServiceId, this.downstreamServiceId, this.eurekaServiceId)
+            .forEach(a -> {
+                log.info("app: " + a);
+                this.cf.destroyApplicationIfExists(a);
+            });
+    }
+
+    private void reset() throws Throwable {
+
+        // delete apps
+
+        // unbind route service
+
+       /* Route downstreamAppRoute = this.forApplicationName(this.routeServiceId);
+        if (null != downstreamAppRoute && cf.applicationExists(this.downstreamServiceId)) {
+            try {
+                log.info(String.format("attempting to unbind route service for host %s and domain %s and service-instance %s",
+                        downstreamAppRoute.getHost(), downstreamAppRoute.getDomain(), routeServiceId));
+
+                cloudFoundryOperations.services()
+                        .unbindRoute(UnbindRouteServiceInstanceRequest.builder()
+                                .serviceInstanceName(routeServiceIdCups).domainName(downstreamAppRoute.getDomain())
+                                .hostname(downstreamAppRoute.getHost()).path(downstreamAppRoute.getPath()).build())
+                        .block();
+            } catch (Throwable t) {
+                log.warn("oops!", t);
+            }
+
+        }*/
+
+
+        /////////////////////////////
+
+
+        //  cf.destroyServiceIfExists(routeServiceIdCups);
+
+        Route first = forApplicationName(downstreamServiceId);
+
+        //deleteApps();
+
+        if (null != first) {
+
+            try {
+                log.info("trying to unbind route service with: " + "domain: "
+                        + first.getDomain() + ", path: " + first.getPath() + ", hostname: "
+                        + first.getHost() + ", routeServiceInstanceId: " + routeServiceIdCups);
+
+
+                this.cloudFoundryOperations
+                        .services()
+                        .unbindRoute(
+                                UnbindRouteServiceInstanceRequest.builder()
+                                        .serviceInstanceName(routeServiceIdCups).domainName(first.getDomain())
+                                        .hostname(first.getHost()).path(first.getPath()).build()).block();
+            } catch (Exception e) {
+                this.log.warn(NestedExceptionUtils.buildMessage(e.getMessage(), e));
+            }
+            this.log.info("done trying to unbind..");
+        }
+
+        ////////////////////////////
+
+        // delete orphaned routes
+        cf.destroyOrphanedRoutes();
+
+        this.deleteApps();
+
+        // delete services
+        String[] svcs = "route-service-svc,routing-eureka-service".split(",");
+        for (String s : svcs) {
+            log.info("service: " + s);
+            try {
+                this.cf.destroyServiceIfExists(s);
+            } catch (ClientV2Exception e) {
+                this.log.info("exception: '" + e.getDescription()
+                        + "' on attempting to delete " + s);
+            }
+        }
+    }
 
     @Autowired
     private CloudFoundryService cf;
@@ -52,22 +169,34 @@ public class RoutingIT {
     @Before
     public void before() throws Throwable {
         File root = new File(".");
-        this.downstreamApplicationManifest = new File(root, "../downstream-service/manifest.yml");
-        this.eurekaServiceManifest = new File(root, "../routing-eureka-service/manifest.yml");
+        this.downstreamApplicationManifest = new File(root,
+                "../downstream-service/manifest.yml");
+        this.eurekaServiceManifest = new File(root,
+                "../routing-eureka-service/manifest.yml");
         this.routeServiceManifest = new File("../route-service/manifest.yml");
 
-        Stream.of(this.downstreamApplicationManifest, this.eurekaServiceManifest, this.routeServiceManifest)
-                .forEach(m -> Assert.assertTrue(m.getAbsolutePath() + " must exist", m.exists()));
+        Stream.of(this.downstreamApplicationManifest, this.eurekaServiceManifest,
+                this.routeServiceManifest).forEach(
+                manifest -> Assert.assertTrue(manifest.getAbsolutePath() + " must exist",
+                        manifest.exists()));
 
+        this.reset();
+    }
+
+   @After
+    public void after() throws Throwable {
         this.reset();
     }
 
     @Test
     public void routeService() throws Throwable {
+
+      //  if (true) return;
+
         this.deployEureka();
         this.deployDownstreamApplication();
         this.deployRouteServiceApplication();
-        this.applyRouteServiceTo(routeServiceId, downstreamServiceId);
+        this.applyRouteService();
         RestTemplate restTemplate = new RestTemplateBuilder().build();
         ResponseEntity<String> responseEntity = restTemplate.getForEntity(
                 this.cf.urlForApplication(downstreamServiceId) + "/hi/world", String.class);
@@ -75,43 +204,6 @@ public class RoutingIT {
         log.info("response: " + body);
         Assert.assertTrue("the request should have been intercepted", body
                 .toLowerCase().contains("Cloud Natives".toLowerCase()));
-    }
-
-    private void reset() throws Throwable {
-
-        this.runUnbindRouteServiceFor(downstreamServiceId);
-
-        String[] apps = "route-service,downstream-service".split(",");
-        for (String a : apps) {
-            log.info("app: " + a);
-            this.cf.destroyApplicationIfExists(a);
-        }
-
-        String[] svcs = "route-service-svc,routing-eureka-service".split(",");
-        for (String s : svcs) {
-            log.info("service: " + s);
-            try {
-                this.cf.destroyServiceIfExists(s);
-            }
-            catch (ClientV2Exception e) {
-                this.log.info("exception: '" + e.getDescription() + "' on attempting to delete " + s);
-            }
-        }
-
-    }
-
-    private void runUnbindRouteServiceFor(String serviceId) throws Throwable {
-        Route downstreamAppRoute = this.forApplicationName(serviceId);
-        if (null != downstreamAppRoute && cf.applicationExists(serviceId)) {
-            this.cloudFoundryOperations.services()
-                    .unbindRoute(UnbindRouteServiceInstanceRequest
-                            .builder()
-                            .domainName(downstreamAppRoute.getDomain())
-                            .serviceInstanceName("route-service-svc")
-                            .hostname(downstreamAppRoute.getHost())
-                            .build())
-                    .block();
-        }
     }
 
     private void deployEureka() throws Throwable {
@@ -160,32 +252,6 @@ public class RoutingIT {
                         () -> new RuntimeException("couldn't deploy the downstream application!"));
     }
 
-    private void applyRouteServiceTo(String routeServiceId,
-                                     String downstreamApplicationId) {
-        log.info("binding route service for routeServiceId: " + routeServiceId
-                + " and downstreamApplicationId: " + downstreamApplicationId);
-        String url = cf.urlForApplication(routeServiceId);
-        if (url.contains("://")) {
-            url = "https://" + url.split("://")[1];
-        }
-        String routeServiceIdCups = routeServiceId + "-svc";
-        this.cloudFoundryOperations
-                .services()
-                .createUserProvidedInstance(
-                        CreateUserProvidedServiceInstanceRequest.builder().name(routeServiceIdCups)
-                                .routeServiceUrl(url).build()).block();
-        Route first = forApplicationName(downstreamApplicationId);
-        log.info("trying to apply route service with: " + "domain: "
-                + first.getDomain() + ", path: " + first.getPath() + ", hostname: "
-                + first.getHost() + ", routeServiceInstanceId: " + routeServiceIdCups);
-        this.cloudFoundryOperations
-                .services()
-                .bindRoute(
-                        BindRouteServiceInstanceRequest.builder()
-                                .serviceInstanceName(routeServiceIdCups).domainName(first.getDomain())
-                                .hostname(first.getHost()).path(first.getPath()).build()).block();
-        this.log.info("done!");
-    }
 
     private Route forApplicationName(String appName) {
         return this.cloudFoundryOperations.routes()
