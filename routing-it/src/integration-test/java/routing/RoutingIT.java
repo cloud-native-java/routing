@@ -54,8 +54,7 @@ public class RoutingIT {
  public void before() throws Throwable {
 
   File root = new File(".");
-  Assert.assertTrue("the script must exist!", this.script.exists());
-
+  
   this.downstreamApplicationManifest = new File(root,
    "../downstream-service/manifest.yml");
   Assert.assertTrue("the Downstream Service manifes should exist.",
@@ -115,7 +114,7 @@ public class RoutingIT {
   this.cloudFoundryOperations.services()
           .unbindRoute(UnbindRouteServiceInstanceRequest
                   .builder()
-                  .domainName("cfapps.io")
+                  .domainName( downstreamAppRoute.getDomain())
                   .serviceInstanceName("route-service-svc")
                   .hostname( downstreamAppRoute.getHost())
                   .build())
