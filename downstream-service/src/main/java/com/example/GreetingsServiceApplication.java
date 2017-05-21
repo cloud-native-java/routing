@@ -28,11 +28,9 @@ class GreetingsRestController {
  @RequestMapping(method = RequestMethod.GET, value = "/hi/{name}")
  Map<String, String> hi(
   @PathVariable String name,
-  @RequestHeader(value = "X-CNJ-Name", required = false) Optional<String> cnjNameHeader) {
-  String resolvedName = /*
-                         * Optional.
-                         * ofNullable
-                         */(cnjNameHeader).orElse(name);
+  @RequestHeader(value = "X-CNJ-Name", required = false)
+          Optional<String> cn) {
+  String resolvedName =  cn.orElse(name);
   return Collections.singletonMap("greeting", "Hello, " + resolvedName + "!");
  }
 }
