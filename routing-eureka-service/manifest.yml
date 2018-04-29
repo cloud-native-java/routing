@@ -1,8 +1,6 @@
 ---
 applications:
 - name: routing-eureka-service
-  memory: 512M
-  instances: 1
-  host: routing-eureka-service-${random-word}
+  path: ./target/routing-eureka-service.jar
+  host: cnj-routing-eureka-service
   buildpack: https://github.com/cloudfoundry/java-buildpack.git
-  path: target/routing-eureka-service.jar

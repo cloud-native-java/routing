@@ -1,8 +1,6 @@
 ---
 applications:
 - name: route-service
-  memory: 512M
-  instances: 1
-  host: route-service-${random-word}
-  path: target/route-service.jar
+  path: ./target/route-service.jar
+  host:  cnj-route-service
   buildpack: https://github.com/cloudfoundry/java-buildpack.git

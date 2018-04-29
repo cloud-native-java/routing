@@ -22,13 +22,10 @@ public class DiscoveryClientCLR implements CommandLineRunner {
  }
 
  @Override
- public void run(String... args) throws Exception {
+ public void run(String... args) {
 
+  // todo i changed the bullets for this!
   // <2>
-  this.log.info("localServiceInstance");
-  this.logServiceInstance(this.discoveryClient.getLocalServiceInstance());
-
-  // <3>
   String serviceId = "greetings-service";
   this.log.info(String.format("registered instances of '%s'", serviceId));
   this.discoveryClient.getInstances(serviceId)
