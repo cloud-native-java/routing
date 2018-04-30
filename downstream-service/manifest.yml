@@ -1,10 +1,10 @@
 ---
 applications:
 - name: downstream-service
-  memory: 512M
-  instances: 1
-  host: cnj-downstream-service
-  buildpack: https://github.com/cloudfoundry/java-buildpack.git
   path: target/downstream-service.jar
+  buildpack: java_buildpack
+  env:
+    JBP_CONFIG_SPRING_AUTO_RECONFIGURATION: '{enabled: false}'
+    SPRING_PROFILES_ACTIVE: cloud
   services:
     - routing-eureka-service
