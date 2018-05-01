@@ -45,6 +45,15 @@ public class Example2 {
 
 		private Log log = LogFactory.getLog(getClass());
 
+		private void error(String msg, Throwable throwable) {
+				if (log.isErrorEnabled()) {
+						log.error(msg, throwable);
+				}
+				else {
+						log.warn(msg);
+				}
+		}
+
 		@Bean
 		ApplicationRunner runner(CloudFoundryOperations cloudfoundry) {
 				return args -> {
@@ -55,8 +64,7 @@ public class Example2 {
 							.flatMap(name -> cloudfoundry
 								.applications().delete(DeleteApplicationRequest.builder().name(name).build())
 								.onErrorResume(IllegalArgumentException.class, ex -> {
-										// swallow
-										log.warn(String.format("can't delete application '%s'", name), ex);
+										error(String.format("can't delete application %s", name), ex);
 										return Mono.empty();
 								})
 								.then(Mono.just(name))
@@ -69,7 +77,7 @@ public class Example2 {
 								cloudfoundry.services()
 									.deleteInstance(DeleteServiceInstanceRequest.builder().name(name).build())
 									.onErrorResume(IllegalArgumentException.class, ex -> {
-											log.warn(String.format("can't delete service '%s'", name), ex);
+											error(String.format("can't delete service %s", name), ex);
 											return Mono.empty();
 									})
 									.then(Mono.just(name))
@@ -91,7 +99,7 @@ public class Example2 {
 							.thenMany(pushAndCreateEurekaBackingService)
 							.thenMany(pushApplications)
 							.doOnComplete(() -> log.info("..done!"))
-							.doOnError(e -> log.error(e))
+							.doOnError(e -> error("couldn't reset and deploy the applications and services", e))
 							.subscribe();
 
 						Thread.sleep(Duration.ofMinutes(5).toMillis());
