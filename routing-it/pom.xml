@@ -9,16 +9,17 @@
         <version>2.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>routing-it</artifactId>
+    <name>routing/routing-it</name>
     <dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-cloudfoundry-commons</artifactId>
-            <version>${spring-cloud-cloudfoundry.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

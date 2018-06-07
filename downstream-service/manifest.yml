@@ -2,6 +2,7 @@
 applications:
 - name: downstream-service
   path: target/downstream-service.jar
+  random-route: true
   buildpack: java_buildpack
   env:
     JBP_CONFIG_SPRING_AUTO_RECONFIGURATION: '{enabled: false}'

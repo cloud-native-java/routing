@@ -2,5 +2,5 @@
 applications:
 - name: route-service
   path: ./target/route-service.jar
-  host:  cnj-route-service
+  random-route: true
   buildpack: https://github.com/cloudfoundry/java-buildpack.git
