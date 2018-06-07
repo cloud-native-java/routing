@@ -28,24 +28,36 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @SpringBootApplication
-public class Example2 {
+public class RoutingIT {
+
+		private final Log log = LogFactory.getLog(getClass());
 
 		private final File root = new File(".");
 		private final File routingEurekaServiceManifest = new File(this.root, "routing-eureka-service/manifest.yml");
 		private final File downstreamServiceManifest = new File(this.root, "downstream-service/manifest.yml");
 		private final File routeServiceManifest = new File(this.root, "route-service/manifest.yml");
 
-		private final Map<File, ApplicationManifest> manifests = Stream
-			.of(this.downstreamServiceManifest, this.routeServiceManifest, this.routingEurekaServiceManifest)
-			.collect(Collectors.toConcurrentMap(x -> x, x -> Utils.getManifestFor(x.toPath())));
+		private final Map<File, ApplicationManifest> manifests;
+		private final Map<File, String> applicationNames;
 
-		private final Map<File, String> applicationNames = manifests
-			.entrySet()
-			.stream()
-			.collect(
-				Collectors.toConcurrentMap(Map.Entry::getKey, x -> x.getValue().getName()));
+		private final CloudFoundryOperations cloudfoundry;
+		private final CloudFoundryService cloudFoundryService;
 
-		private Log log = LogFactory.getLog(getClass());
+		public RoutingIT(CloudFoundryService cloudFoundryService, CloudFoundryOperations cloudfoundry) {
+				this.cloudFoundryService = cloudFoundryService;
+
+				this.manifests = Stream
+					.of(this.downstreamServiceManifest, this.routeServiceManifest, this.routingEurekaServiceManifest)
+					.collect(Collectors.toConcurrentMap(x -> x, x -> cloudFoundryService.getManifestFor(x.toPath())));
+
+				this.cloudfoundry = cloudfoundry;
+
+				this.applicationNames = this.manifests
+					.entrySet()
+					.stream()
+					.collect(
+						Collectors.toConcurrentMap(Map.Entry::getKey, x -> x.getValue().getName()));
+		}
 
 		private void error(String msg, Throwable throwable) {
 				log.warn("oh the humanity! " + msg);
@@ -55,16 +67,15 @@ public class Example2 {
 		}
 
 		@Bean
-		ApplicationRunner runner(CloudFoundryOperations cloudfoundry) {
+		ApplicationRunner runner() {
 				return args -> {
-
 
 						// unbind route service if it exists
 						String routeServiceAppName = this.manifests.get(this.routeServiceManifest).getName();
 						String downstreamServiceAppName = this.manifests.get(this.downstreamServiceManifest).getName();
 
-						Flux<String> unbindRouteService = Utils
-							.findRoutesForApplication(cloudfoundry, downstreamServiceAppName)
+						Flux<String> unbindRouteService = cloudFoundryService
+							.findRoutesForApplication(downstreamServiceAppName)
 							.flatMap(route ->
 								cloudfoundry
 									.services()
@@ -115,8 +126,8 @@ public class Example2 {
 						Flux<String> pushAndCreateEurekaBackingService = Flux
 							.just((this.routingEurekaServiceManifest))
 							.map(this.manifests::get)
-							.flatMap(manifest -> Utils.pushApplication(cloudfoundry, manifest))
-							.flatMap(app -> Utils.createBackingService(cloudfoundry, app))
+							.flatMap(cloudFoundryService::pushApplication)
+							.flatMap(cloudFoundryService::createBackingService)
 							.doOnComplete(() -> Stream.of(this.routingEurekaServiceManifest)
 								.map(this.manifests::get)
 								.forEach(m -> log.info("pushed and created backing service for " + m.getName())));
@@ -124,15 +135,15 @@ public class Example2 {
 						Flux<String> pushApplications = Flux
 							.just(this.routeServiceManifest, this.downstreamServiceManifest)
 							.map(this.manifests::get)
-							.flatMap(manifest -> Utils.pushApplication(cloudfoundry, manifest))
+							.flatMap(cloudFoundryService::pushApplication)
 							.doOnComplete(() -> Stream
 								.of(this.routeServiceManifest, this.downstreamServiceManifest)
 								.map(this.manifests::get)
 								.forEach(m -> log.info("pushed " + m.getName()))
 							);
 
-						Flux<String> createBackingRouteService = Utils
-							.urlForApplication(cloudfoundry, routeServiceAppName, true)
+						Flux<String> createBackingRouteService = cloudFoundryService
+							.urlForApplication(routeServiceAppName, true)
 							.flatMapMany(url ->
 								cloudfoundry
 									.services()
@@ -148,8 +159,8 @@ public class Example2 {
 							.doOnError(ex -> error("something went wrong in creating the backing route service " + routeServiceAppName, ex))
 							.doOnComplete(() -> log.info("CUPS for " + routeServiceAppName));
 
-						Flux<String> bindRouteService = Utils
-							.findRoutesForApplication(cloudfoundry, downstreamServiceAppName)
+						Flux<String> bindRouteService = cloudFoundryService
+							.findRoutesForApplication(downstreamServiceAppName)
 							.flatMap(route ->
 								cloudfoundry
 									.services()
@@ -189,45 +200,47 @@ public class Example2 {
 		}
 
 		public static void main(String args[]) {
-				SpringApplication.run(Example2.class, args);
+				SpringApplication.run(RoutingIT.class, args);
 		}
 }
 
+@Service
+class CloudFoundryService {
 
+		private final CloudFoundryOperations cf;
 
-abstract class Utils {
+		CloudFoundryService(CloudFoundryOperations cf) {
+				this.cf = cf;
+		}
 
-		public static Flux<Route> findRoutesForApplication(CloudFoundryOperations cf, String appName) {
+		public Flux<Route> findRoutesForApplication(String appName) {
 				return cf
 					.routes()
 					.list(ListRoutesRequest.builder().build())
 					.filter(r -> r.getApplications().contains(appName));
 		}
 
-		public static Mono<String> pushApplication(CloudFoundryOperations cf, ApplicationManifest manifest) {
-				String appName = Utils.getNameForManifest(manifest);
+		public Mono<String> pushApplication(ApplicationManifest manifest) {
+				String appName = getNameForManifest(manifest);
 				return cf
 					.applications()
 					.pushManifest(PushApplicationManifestRequest.builder().manifest(manifest).build())
 					.then(Mono.just(appName));
 		}
 
-		public static Mono<String> createBackingService(CloudFoundryOperations cloudFoundryOperations, String applicationNameMono) {
+		public Mono<String> createBackingService(String applicationNameMono) {
 				return Mono.just(applicationNameMono).flatMap(
-					appName -> cloudFoundryOperations
+					appName -> cf
 						.applications()
 						.get(GetApplicationRequest.builder().name(appName).build())
-						.flatMap(x -> Utils.urlForApplication(cloudFoundryOperations, appName, false))
+						.flatMap(x -> urlForApplication(appName, false))
 						.map(url -> Collections.singletonMap("uri", url))
 						.flatMap(
-							credentials -> cloudFoundryOperations.services()
-								.createUserProvidedInstance(
-									CreateUserProvidedServiceInstanceRequest.builder().name(appName)
-										.credentials(credentials).build())).then(Mono.just(appName)));
+							credentials -> cf.services()
+								.createUserProvidedInstance(CreateUserProvidedServiceInstanceRequest.builder().name(appName).credentials(credentials).build())).then(Mono.just(appName)));
 		}
 
-		public static Mono<String> urlForApplication(CloudFoundryOperations cf,
-																																															String appName, boolean https) {
+		public Mono<String> urlForApplication(String appName, boolean https) {
 				return cf
 					.applications()
 					.get(GetApplicationRequest.builder().name(appName).build())
@@ -235,23 +248,23 @@ abstract class Utils {
 					.map(url -> "http" + (https ? "s" : "") + "://" + url);
 		}
 
-		public static String getNameForManifest(File f) {
+		public String getNameForManifest(File f) {
 				return getNameForManifest(f.toPath());
 		}
 
-		public static ApplicationManifest getManifestFor(Path p) {
+		public ApplicationManifest getManifestFor(Path p) {
 				return ApplicationManifestUtils.read(p).iterator().next();
 		}
 
-		public static String getNameForManifest(Path p) {
+		public String getNameForManifest(Path p) {
 				return getNameForManifest(getManifestFor(p));
 		}
 
-		public static String getNameForManifest(ApplicationManifest applicationManifest) {
+		public String getNameForManifest(ApplicationManifest applicationManifest) {
 				return applicationManifest.getName();
 		}
 
-		public static Mono<String> pushApplicationAndCreateBackingService(CloudFoundryOperations cf, ApplicationManifest manifest) {
-				return pushApplication(cf, manifest).flatMap(appName -> createBackingService(cf, appName));
+		public Mono<String> pushApplicationAndCreateBackingService(ApplicationManifest manifest) {
+				return pushApplication(manifest).flatMap(this::createBackingService);
 		}
 }
