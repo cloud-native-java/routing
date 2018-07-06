@@ -1,18 +1,20 @@
 package routing;
 
+import cnj.CloudFoundryService;
+import lombok.Data;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cloudfoundry.operations.CloudFoundryOperations;
-import org.cloudfoundry.operations.applications.*;
+import org.cloudfoundry.operations.applications.ApplicationManifest;
+import org.cloudfoundry.operations.applications.DeleteApplicationRequest;
 import org.cloudfoundry.operations.routes.DeleteOrphanedRoutesRequest;
-import org.cloudfoundry.operations.routes.ListRoutesRequest;
-import org.cloudfoundry.operations.routes.Route;
 import org.cloudfoundry.operations.services.BindRouteServiceInstanceRequest;
 import org.cloudfoundry.operations.services.CreateUserProvidedServiceInstanceRequest;
 import org.cloudfoundry.operations.services.DeleteServiceInstanceRequest;
 import org.cloudfoundry.operations.services.UnbindRouteServiceInstanceRequest;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.reactivestreams.Publisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,9 +25,8 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.io.File;
-import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -37,25 +38,43 @@ public class RoutingIT {
 		public static class Config {
 
 				@Bean
-				RouteServiceDeployer routeServiceDeployer(CloudFoundryService cfs, CloudFoundryOperations cops) {
+				RouteServiceDeployer routeServiceDeployer(
+					CloudFoundryService cfs,
+					CloudFoundryOperations cops) {
 						return new RouteServiceDeployer(cfs, cops);
-				}
-
-				@Bean
-				CloudFoundryService cfs(CloudFoundryOperations ops) {
-						return new CloudFoundryService(ops);
 				}
 		}
 
 		@Autowired
 		private RouteServiceDeployer routeServiceDeployer;
 
+		@Autowired
+		private CloudFoundryOperations cloudFoundryOperations;
+
 		@Test
 		public void deploy() {
+
+				Function<String, Mono<Boolean>> appExists = input -> this.cloudFoundryOperations.applications().list().filter(si -> si.getName().equals(input)).hasElements();
+				Function<String, Mono<Boolean>> svcExists = input -> this.cloudFoundryOperations.services().listInstances().filter(si -> si.getName().equals(input)).hasElements();
+
+				DeployResult deployResult = this.routeServiceDeployer.deploy();
+
+				Publisher<Boolean> just = Flux
+					.just(
+						appExists.apply(deployResult.getDownstreamServiceAppName()),
+						svcExists.apply(deployResult.getRouteServiceName()),
+						svcExists.apply(deployResult.getRoutingEurekaServiceName()))
+					.flatMap(m -> m.flatMap(Mono::just));
+
+				Flux<Boolean> results = Flux
+					.from(deployResult.getResults())
+					.thenMany(just);
+
 				StepVerifier
-					.create(this.routeServiceDeployer.deploy())
-					.expectNextCount(1)
-					.expectNext("route-service")
+					.create(results)
+					.expectNextMatches(x -> x)
+					.expectNextMatches(x -> x)
+					.expectNextMatches(x -> x)
 					.verifyComplete();
 		}
 }
@@ -64,10 +83,11 @@ class RouteServiceDeployer {
 
 		private final Log log = LogFactory.getLog(getClass());
 
-		private final File root = new File(".");
+		private final File root = new File("..");
+
+		private final File routeServiceManifest = new File(this.root, "route-service/manifest.yml");
 		private final File routingEurekaServiceManifest = new File(this.root, "routing-eureka-service/manifest.yml");
 		private final File downstreamServiceManifest = new File(this.root, "downstream-service/manifest.yml");
-		private final File routeServiceManifest = new File(this.root, "route-service/manifest.yml");
 
 		private final Map<File, ApplicationManifest> manifests;
 		private final Map<File, String> applicationNames;
@@ -75,7 +95,7 @@ class RouteServiceDeployer {
 		private final CloudFoundryOperations cloudfoundry;
 		private final CloudFoundryService cloudFoundryService;
 
-		public RouteServiceDeployer(CloudFoundryService cloudFoundryService, CloudFoundryOperations cloudfoundry) {
+		RouteServiceDeployer(CloudFoundryService cloudFoundryService, CloudFoundryOperations cloudfoundry) {
 				this.cloudFoundryService = cloudFoundryService;
 
 				this.manifests = Stream
@@ -87,8 +107,8 @@ class RouteServiceDeployer {
 				this.applicationNames = this.manifests
 					.entrySet()
 					.stream()
-					.collect(
-						Collectors.toConcurrentMap(Map.Entry::getKey, x -> x.getValue().getName()));
+					.collect(Collectors.toConcurrentMap(Map.Entry::getKey, x -> x.getValue().getName()));
+
 		}
 
 		private void error(String msg, Throwable throwable) {
@@ -98,11 +118,12 @@ class RouteServiceDeployer {
 				}
 		}
 
-		public Flux<String> deploy() {
+		public DeployResult deploy() {
 
 				// unbind route service if it exists
 				String routeServiceAppName = this.manifests.get(this.routeServiceManifest).getName();
 				String downstreamServiceAppName = this.manifests.get(this.downstreamServiceManifest).getName();
+				String routingEurekaServiceAppName = this.manifests.get(this.routingEurekaServiceManifest).getName();
 
 				Flux<String> unbindRouteService = cloudFoundryService
 					.findRoutesForApplication(downstreamServiceAppName)
@@ -115,7 +136,8 @@ class RouteServiceDeployer {
 								.domainName(route.getDomain())
 								.hostname(route.getHost())
 								.path(route.getPath())
-								.build())
+								.build()
+							)
 							.thenMany(Mono.just(routeServiceAppName))
 					)
 					.doOnError(ex -> error("something went wrong in unbinding the route service " + routeServiceAppName, ex))
@@ -156,7 +178,7 @@ class RouteServiceDeployer {
 				Flux<String> pushAndCreateEurekaBackingService = Flux
 					.just((this.routingEurekaServiceManifest))
 					.map(this.manifests::get)
-					.flatMap(cloudFoundryService::pushApplication)
+					.flatMap(cloudFoundryService::pushApplicationWithManifest)
 					.flatMap(cloudFoundryService::createBackingService)
 					.doOnComplete(() -> Stream.of(this.routingEurekaServiceManifest)
 						.map(this.manifests::get)
@@ -165,7 +187,7 @@ class RouteServiceDeployer {
 				Flux<String> pushApplications = Flux
 					.just(this.routeServiceManifest, this.downstreamServiceManifest)
 					.map(this.manifests::get)
-					.flatMap(cloudFoundryService::pushApplication)
+					.flatMap(cloudFoundryService::pushApplicationWithManifest)
 					.doOnComplete(() -> Stream
 						.of(this.routeServiceManifest, this.downstreamServiceManifest)
 						.map(this.manifests::get)
@@ -212,7 +234,7 @@ class RouteServiceDeployer {
 						.deleteOrphanedRoutes(DeleteOrphanedRoutesRequest.builder().build())
 						.then(Mono.just(true));
 
-				return Flux
+				Publisher<Boolean> deployPublisher = Flux
 					.from(unbindRouteService)
 					.thenMany(deleteApplications)
 					.thenMany(deleteOrphanedRoutes)
@@ -221,7 +243,29 @@ class RouteServiceDeployer {
 					.thenMany(pushApplications)
 					.thenMany(createBackingRouteService)
 					.thenMany(bindRouteService)
+					.thenMany(Mono.just(true))
 					.doOnComplete(() -> log.info("..done!"))
 					.doOnError(e -> error("could not reset and deploy the applications and services", e));
+
+				return new DeployResult(routeServiceAppName, downstreamServiceAppName, routingEurekaServiceAppName, deployPublisher);
 		}
+}
+
+
+@Data
+class DeployResult {
+
+		private final Publisher<Boolean> results;
+		private final String routeServiceName, routingEurekaServiceName, downstreamServiceAppName;
+
+		public DeployResult(String routeServiceName, String downstreamServiceAppName,
+																						String routingEurekaServiceName,
+																						Publisher<Boolean> results) {
+				this.routeServiceName = routeServiceName;
+				this.routingEurekaServiceName = routingEurekaServiceName;
+				this.downstreamServiceAppName = downstreamServiceAppName;
+				this.results = results;
+		}
+
+
 }
