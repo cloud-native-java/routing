@@ -10,4 +10,4 @@ cache:
     - $HOME/.m2/repository/
 
 script:
-  -  mvn -e verify deploy
+  -  mvn -X -e verify deploy
